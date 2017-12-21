@@ -14,3 +14,4 @@ setquota -u -F vsfv0 $username $block_soft_limit $block_hard_limit $inodes_soft 
 >>repquota -a to check 
 
 
+https://gehrcke.de/2013/05/setting-up-quotas-on-a-local-linux-file-system/
