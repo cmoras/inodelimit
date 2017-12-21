@@ -1,0 +1,20 @@
+for i in $(cat /usr/local/eig_zabbix/tmp/zabbix_inode_abuse | awk '{print $1}');
+ do
+ temp=$i;
+	for user in $(ls -lah /home | grep $temp | awk '{print $NF}'); 
+		do echo "Moving into $user home directory";
+			cd $user; 
+
+			echo "Setting up the inodes report"; 
+			echo "Creating text file under the $user directory"; 
+			touch $user/inode-distribution.txt; 
+			inodes > inode-distribution.txt; 
+			own=$(echo $user | cut -d/ -f3); 
+			echo "$own : Following ownership will be set up for the text file generated"; 
+			chown $own:$own $user/inode-distribution.txt; 
+			echo "Setting ownership complete"; 
+			echo "Moving out of $user home directory" ; 
+			echo "Please put a note in cpanel about the inode details" ;
+		cd .. ;
+	done;
+done &
