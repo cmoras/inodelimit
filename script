@@ -13,6 +13,9 @@ for i in $(cat /usr/local/eig_zabbix/tmp/zabbix_inode_abuse | awk '{print $1}');
 			echo "$own : Following ownership will be set up for the text file generated"; 
 			chown $own:$own $user/inode-distribution.txt; 
 			echo "Setting ownership complete"; 
+			a=$(python -c "print 1 * 1024**2");
+			b=1000000;
+			setquota -u -F vsfv0 $user $a $a $b $b /home			    
 			echo "Moving out of $user home directory" ; 
 			echo "Please put a note in cpanel about the inode details" ;
 		cd .. ;
