@@ -3,36 +3,38 @@ sep="=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=";
 #host=arvixe
 link1="https://confluence.endurance.com/display/EMC/APAC-EMC+-+ASO+-+ToS+Inodes";
 link2="https://confluence.endurance.com/display/EMC/ASO-Arvixe-Site+5+Disk+Clean+up+Linux";
+inum_lower=1000000;
+inum_upper=3000000;
 
 case $host in
 	arvixe|mysitehosted)
         echo "This is a Arvixe box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
-        inum_lower=1500000;inum_upper=3000000;echo $sep;
-        echo  "inode limit will be set to $inodes_quota";
+        echo $sep;
+        echo  "inode limit will be set to $inum_lower";
         ;;
 
 	webhosting|seowebhosting|seoboxes)
         echo "This is SEO [web] hosting."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
-        inum_lower=1000000;inum_upper=3000000;echo $sep;
-        echo  "inode limit will be set to $inodes_quota";
+        echo $sep;
+        echo  "inode limit will be set to $inum_lower";
         ;;
 
 	myserverhosts)
         echo "This is a H9 box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
-        inum_lower=1500000;inum_upper=3000000;echo $sep;
-        echo  "inode limit will be set to $inodes_quota";
+        echo $sep;
+        echo  "inode limit will be set to $inum_lower";
         ;;
 
 	asoshared)
         echo "This is a ASO shared box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
-        inum_lower=1000000;inum_upper=3000000;echo $sep;
-        echo  "inode limit will be set to $inodes_quota";
+        echo $sep;
+        echo  "inode limit will be set to $inum_lower";
         ;;
 
 	accountservergroup)
         echo "This is a new site5 box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
-        inum_lower=1000000;inum_upper=3000000;echo $sep;
-        echo  "inode limit will be set to $inodes_quota";
+        echo $sep;
+        echo  "inode limit will be set to $inum_lower";
         ;;
 
 	*)
@@ -44,22 +46,21 @@ cat  /usr/local/eig_zabbix/tmp/zabbix_inode_abuse |  while read user inum
 do
 	if [[ "$inum" -gt "$inum_lower" ]]; then
 		echo "Needs to be taken care of ...."
+		home_path0=`getent passwd $user`; home_path1=`echo $home_path0| awk -F: "/$user/"'{print $6}' /etc/passwd`
+		echo "Entering the user home directory...."; 
+
+		cd $home_path1; pwd;home=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd))) |grep dev | awk '{print $NF}';
+
+		echo "$home is the mount pointfor the $user";
+		echo "Setting the following inode limit for the $user : $inum_lower"
+		clear;
+		#dquota=$(repquota -s  $home | awk "/$user/"'{print $4}');
+		echo $sep; echo $sep;
+		echo "Proceeding with setting the quota restrcitions for the user: $user";
+		echo "Stage1: Creating a inode-distribution file and setting up ownership"
+		touch inode-distribution.txt; chown $user:$user inode-distribution.txt;#inodes > inode-distribution.txt;
+		echo $sep; echo $sep;
+		echo "Stage2:Setting quota now."
+		#setquota -u $user $dquota $dquota $inum_lower $inum_lower $home;
 	fi;
-
-home_path=`getent passwd $user`; 
-echo "Entering the user home directory...."; 
-cd $home_path; home=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd))) |grep dev | awk '{print $NF}');
-
-user=$(echo $home_path| awk -F/ '{print $3}'); 
-
-echo "$home is the mount pointfor the $user";
-echo "Setting the following inode limit for the $user : $inum_lower"
-#dquota=$(repquota -s  $home | awk "/$user/"'{print $4}');
-
-echo "Do you want to proceed with setting the quota restrcitions for the user: $user";
-
-
-done;
-
-
-	
+done
