@@ -1,0 +1,73 @@
+host=$(echo $HOSTNAME  | egrep -o "arvixe|mysitehosted|myserverhosts|seoboxes|asoshared|accountservergroup|ibdlsoclenmo");
+sep="=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=";
+#host=arvixe
+link1="https://confluence.endurance.com/display/EMC/APAC-EMC+-+ASO+-+ToS+Inodes";
+link2="https://confluence.endurance.com/display/EMC/ASO-Arvixe-Site+5+Disk+Clean+up+Linux";
+#inum_lower=1000000;
+inum_upper=3000000;
+
+case $host in
+	arvixe|mysitehosted)
+        echo "This is a Arvixe box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+        echo $sep;inum_lower=1500000;
+        echo  "inode limit will be set to $inum_lower";
+        ;;
+
+	webhosting|seowebhosting|seoboxes)
+        echo "This is SEO [web] hosting."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+        echo $sep;inum_lower=1000000;
+        echo  "inode limit will be set to $inum_lower";
+        ;;
+
+	myserverhosts)
+        echo "This is a H9 box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+        echo $sep;inum_lower=1500000;
+        echo  "inode limit will be set to $inum_lower";
+        ;;
+
+	asoshared)
+        echo "This is a ASO shared box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+        echo $sep;inum_lower=1000000;
+        echo  "inode limit will be set to $inum_lower";
+        ;;
+
+	accountservergroup)
+        echo "This is a new site5 box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+        echo $sep;inum_lower=1000000;
+        echo  "inode limit will be set to $inum_lower";
+        ;;
+
+	ibdlsoclenmo)
+	echo "Local machine";
+	inum_lower=1000000;
+	;;
+	
+	*)
+	echo "Appears to be a brand outside of my jurisdiction. I'm now bork"
+        ;;
+esac
+
+cat  /usr/local/eig_zabbix/tmp/zabbix_inode_abuse| while read user inum; 
+do 
+	if [[ "$inum" -gt "$inum_lower" && "$inum" -lt "$inum_upper" ]]; then 
+		home_path0=`getent passwd $user`; 
+		home=`echo $home_path0| awk -F: "/$user/"'{print $6}' /etc/passwd`; 
+		cd $home; echo "$home is the mount point for the $user";
+		echo "Setting the following inode limit for the $user : $inum_lower";
+		mount_point=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd))) |grep dev | awk '{print $NF}';
+		echo $mount_point; 
+		echo "Proceeding with setting the quota restrcitions for the user: $user";
+		echo $sep; echo $sep;
+		echo "Stage1: Creating a inode-distribution file and setting up ownership";
+		echo "creating the distributoin file";sudo touch inode-distribution.txt;
+		#sudo  chown $user:$user inode-distribution.txt;
+		#sudo inodes > inode-distribution.txt;
+		echo $sep;echo $sep;
+		sudo find $home -xdev -printf '%h\n' | sort | uniq -c | sort -nk1 | tail -n10 >> inode-distribution.txt 2>&1
+		echo "Stage2:Setting quota now.";  
+		#setquota -u $user $dquota $dquota $inum_lower $inum_lower $home;
+	else
+		echo "Needs suspension above 3M??"
+	fi;
+done
+
