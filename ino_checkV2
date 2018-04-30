@@ -7,6 +7,9 @@ link2="https://confluence.endurance.com/display/EMC/ASO-Arvixe-Site+5+Disk+Clean
 inum_thresh=1000000;
 inum_upper=3000000;
 
+logger () { echo "$( date  "+%m/%d/%Y:%H:%M:%S" ) $1"; };
+log_file=/var/log/inode_log;
+
 case $host in
 	arvixe|mysitehosted)
         echo "This is a Arvixe box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
@@ -53,27 +56,26 @@ do
 	if [[ "$inum" -gt "$inum_thresh" && "$inum" -lt "$inum_upper" ]]; then 
 		home_path0=`getent passwd $user`; 
 		home=`echo $home_path0| awk -F: "/$user/"'{print $6}' /etc/passwd`; 
-		cd $home;echo $sep;echo sep;echo "Starting recovery of mount point, path, directory name";
-		echo "$home is the mount point for the $user";
-		echo "Setting the following inode limit for the $user : $inum_lower";
+		cd $home;
+		logger $sep | tee -a $log_file;
+		logger $sep |tee -a $log_file ;logger "Starting recovery of mount point, path, directory name" | tee -a $log_file;
+		logger "$home is the mount point for the $user" | tee -a $log_file;
+		logger "Setting the following inode limit for the $user : $inum_lower" | tee -a $log_file;
 		mount_point=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd)) |grep dev | awk '{print $NF}'); 
 		dquota=$(repquota -v $mount_point| awk "/^$user /"'{print $4}');
-		echo "Proceeding with setting the quota restrcitions for $user";sleep 3s; clear;
-		echo $sep1;
-		echo "Stage1: Creating a inode-distribution file and setting up ownership";
-		echo "Creating the distribution file";#touch inode-distribution.txt;
+		#echo $user; echo $dquota; echo $inum_lower; echo $home; echo $mount_point;
+		logger "Proceeding with setting the quota restrcitions for $user" | tee -a $log_file ;sleep 3s;
+		logger "Stage1: Creating a inode-distribution file and setting up ownership" | tee -a $log_file;
+		logger "Creating the distribution file" | tee -a  $log_file;
+		#touch inode-distribution.txt;
 		#chown $user:$user inode-distribution.txt;
-		clear; echo $sep1;
-		#/root/bin/inodes >> inode-distribution.txt; sleep2s;
-		clear;
+		#/root/bin/inodes >> inode-distribution.txt; sleep 2s; 
 		#sudo find $home -xdev -printf '%h\n' | sort | uniq -c | sort -nk1 | tail -n10 >> inode-distribution.txt 2>&1
-		echo "Stage2: Setting quota now...";
-		echo $sep1;  
+		logger "Stage2: Setting quota now..." | tee -a $log_file;
 		#/usr/sbin/setquota -u $user $dquota $dquota $inum_lower $inum_lower $mount_point;
 		#echo $user; echo $dquota; echo $inum_lower; echo $home; echo $mount_point;
-		echo "Applying user restrcitions complete"; echo $sep;
+		logger "Allpying user restrcitions complete" | tee -a log_file; logger  $sep | tee -a $log_file;
 	else
 		echo "Needs suspension above 3M??"
 	fi;
 done
-
