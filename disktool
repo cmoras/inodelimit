@@ -1,0 +1,134 @@
+#!/bin/bash
+
+touch  /var/log/inode_log;
+logger () { echo "$( date  "+%m/%d/%Y:%H:%M:%S" ) $1"; };
+log_file=/var/log/inode_log;
+
+
+PS3='opts>>   '
+options=("BlockQuota" "InodeQuota" "SuspendList")
+
+select op in "${options[@]}";
+do
+
+case $op in  
+#first section begins---under progress
+
+		"BlockQuota") echo "this is the section for block quota";
+			        echo "User >> "; 
+			      	while read user; 
+				do 
+				path=$(ls -lah /home | grep ^$user| awk '{print $NF}'); 
+				size_user=$(du -s $path | awk '{print $1}'); 
+				dquota1=$(( $size_user + 500 )); 
+				inum_lower1=$(repquota -s  $mount_point | grep $user  |awk '{print $NF}'); 
+				/usr/sbin/setquota -u $user $dquota1 $dquota1 $inum_lower1 $inum_lower1 $mount_point; 
+				echo "Setting block quota done....."; done			
+				;;
+#second section begins
+
+		"InodeQuota") echo "Inode section"
+			        host=$(echo $HOSTNAME  | egrep -o "arvixe|mysitehosted|myserverhosts|seoboxes|asoshared|accountservergroup|ibdlsoclenmo");
+				inum_thresh=1000000;
+				inum_upper=3000000;
+
+				case $host in
+						arvixe|mysitehosted)
+					        echo "This is a Arvixe box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+					        echo $sep;inum_lower=1500000;
+					        echo  "inode limit will be set to $inum_lower";
+        					;;
+
+						webhosting|seowebhosting|seoboxes)
+					        echo "This is SEO [web] hosting."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+					        echo $sep;inum_lower=1000000;
+					        echo  "inode limit will be set to $inum_lower";
+        					;;
+	
+						myserverhosts)
+					        echo "This is a H9 box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+					        echo $sep;inum_lower=1500000;
+					        echo  "inode limit will be set to $inum_lower";
+					        ;;
+	
+						asoshared)
+					        echo "This is a ASO shared box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+					        echo $sep;inum_lower=1000000;
+					        echo  "inode limit will be set to $inum_lower";
+					        ;;
+
+						accountservergroup)
+					        echo "This is a new site5 box."; echo $sep;echo -e "Limit will be set as per \n $link1 \n $link2"
+					        echo $sep;inum_lower=1000000;
+					        echo  "inode limit will be set to $inum_lower";
+					        ;;
+
+						ibdlsoclenmo)
+						echo "Local machine";
+						inum_lower=1000000;
+						;;
+						
+						*)
+						echo "Appears to be a brand outside of my jurisdiction. I'm now bork"
+        					;;
+				
+
+				esac
+
+				cat  /usr/local/eig_zabbix/tmp/zabbix_inode_abuse| while read user inum; 
+				do 
+				if [[ "$inum" -gt "$inum_thresh" && "$inum" -lt "$inum_upper" ]]; then 
+					home_path0=`getent passwd $user`; 
+					home=`echo $home_path0| awk -F: "/$user/"'{print $6}' /etc/passwd`; 
+					cd $home;
+					logger $sep | tee -a $log_file;
+					logger $sep |tee -a $log_file ;logger "Starting recovery of mount point, path, directory name" | tee -a $log_file;
+					logger "$home is the mount point for the $user" | tee -a $log_file;
+					logger "Setting the following inode limit for the $user : $inum_lower" | tee -a $log_file;
+					mount_point=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd)) |grep dev | awk '{print $NF}'); 
+					dquota=$(repquota -v $mount_point| awk "/^$user /"'{print $4}');
+					#echo $user; echo $dquota; echo $inum_lower; echo $home; echo $mount_point;
+					logger "Proceeding with setting the quota restrcitions for $user" | tee -a $log_file ;sleep 3s;
+					logger "Stage1: Creating a inode-distribution file and setting up ownership" | tee -a $log_file;
+					logger "Creating the distribution file" | tee -a  $log_file;
+					touch inode-distribution.txt;
+					chown $user:$user inode-distribution.txt;
+					/root/bin/inodes >> inode-distribution.txt; sleep 2s; 
+					#sudo find $home -xdev -printf '%h\n' | sort | uniq -c | sort -nk1 | tail -n10 >> inode-distribution.txt 2>&1
+					logger "Stage2: Setting quota now..." | tee -a $log_file;
+					/usr/sbin/setquota -u $user $dquota $dquota $inum_lower $inum_lower $mount_point;
+					#echo $user; echo $dquota; echo $inum_lower; echo $home; echo $mount_point;
+					logger "Applying user restrcitions complete" | tee -a log_file; logger  $sep | tee -a $log_file;
+				else
+					echo "Needs suspension above 3M??"
+				fi;
+				done
+				;;
+
+
+#third section begins
+		"SuspendList") echo ".....eioeioooo";
+			     cd /var/cpanel/suspended; find ! -name '*.lock' -ctime +180 -exec ls  {} \; |sed 's/.\///g' | while read user;
+				do
+					size_inMG=$(repquota -as | grep ^$user | awk '{print $3}' | egrep  "M|G");
+					if [[ $size_inMG != ""  ]]; then
+       						size_num=$( echo $size_inMG | grep -oP "(?<=).*(?=M)");
+        					if [[ $size_num -gt "1000" ]]; then
+                					size_of_the_account=$(echo $(( $size_num / 1024 ))G);
+        					else
+					            	size_of_the_account=$(echo "$size_num"M);
+        					fi
+						current_date=$(date  | awk '{print $2" "$3" "$4" "$NF}');
+					        date_of_suspension=$(cat /var/cpanel/users/$user| grep  -oP "(?<=SUSPENDTIME=).*(?=)");
+					        days_since_the_suspension=$(( ($(date --date="$current_date" +%s) - $date_of_suspension )/(86400) ));
+					        echo "$user $size_of_the_account $days_since_the_suspension";
+					fi
+					done |sed '1i=======\nUsers Size Days_since_suspension' | column -t
+
+					echo "Remember to email Casey about this......";
+					;;
+		*) echo "Read what you have written"
+		echo "if you want to exit --> hit Ctrl+D";;
+esac
+done
+
