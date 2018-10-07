@@ -1,0 +1,58 @@
+host=$(echo $HOSTNAME  | egrep -o "arvixe|mysitehosted|myserverhosts|seoboxes|asoshared|accountservergroup|ibdlsoclenmo");
+inum_thresh=1000000;
+
+case $host in
+	arvixe|mysitehosted|arvixeshared)
+	inum_lower=1500000;
+	;;
+
+	webhosting|seowebhosting|seoboxes)
+	inum_lower=1000000;
+	;;
+	
+	myserverhosts)
+	inum_lower=1500000;
+	;;
+	
+	asoshared)
+	inum_lower=1000000;
+        ;;
+
+	accountservergroup|webserversystems)
+	inum_lower=1500000;
+        ;;
+
+	*)
+	exit 1
+        ;;
+				
+esac
+
+isfailed=0
+
+temp=[]
+
+cat  /usr/local/eig_zabbix/tmp/zabbix_inode_abuse| while read user inum; 
+	do 
+		home_path0=`getent passwd $user`; 
+		home=`echo $home_path0| awk -F: "/$user/"'{print $6}' /etc/passwd`; 
+		cd $home;
+		mount_point=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd)) |grep dev | awk '{print $NF}'); 
+		dquota=$(repquota -v $mount_point| awk "/^$user /"'{print $4}');
+		touch inode-distribution.txt;
+		chown $user:$user inode-distribution.txt;
+		/root/bin/inodes >> inode-distribution.txt; sleep 2s; 
+		/usr/sbin/setquota -u $user $dquota $dquota $inum_lower $inum_lower $mount_point;
+		if [[ $? == "0" ]]; then 
+			temp+=($user)
+			isfailed+=1		
+		fi
+done
+if [[ isfailed -gt '0' ]]; then
+	echo "Setquota failed for following users" 
+	echo "Count  : $isfailed"
+	for i in ${temp[@]}; do
+		echo $i
+	exit 1;
+else
+	exit 0
