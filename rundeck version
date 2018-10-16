@@ -1,58 +1,83 @@
+>report
 host=$(echo $HOSTNAME  | egrep -o "arvixe|mysitehosted|myserverhosts|seoboxes|asoshared|accountservergroup|ibdlsoclenmo");
 inum_thresh=1000000;
 
+ 
 case $host in
-	arvixe|mysitehosted|arvixeshared)
-	inum_lower=1500000;
-	;;
-
-	webhosting|seowebhosting|seoboxes)
-	inum_lower=1000000;
-	;;
-	
-	myserverhosts)
-	inum_lower=1500000;
-	;;
-	
-	asoshared)
-	inum_lower=1000000;
+        arvixe|mysitehosted|arvixeshared)
+        inum_lower=1500000;
         ;;
-
-	accountservergroup|webserversystems)
-	inum_lower=1500000;
+ 
+        webhosting|seowebhosting|seoboxes)
+        inum_lower=1000000;
         ;;
-
-	*)
-	exit 1
+       
+        myserverhosts)
+        inum_lower=1500000;
         ;;
-				
+       
+        asoshared)
+        inum_lower=1000000;
+        ;;
+ 
+        accountservergroup|webserversystems)
+        inum_lower=1500000;
+        ;;
+ 
+        *)
+        exit 1
+        ;;
+                               
 esac
-
+ 
 isfailed=0
+unset temp
+unset userlist
+
+function set_file {
+	arr=("$@")
+	echo "------------" >> report
+	echo "Check the following users's home directory for inode-distribution file" >> report
+	for i in ${arr[@]}; do echo $i; done   >> report
+	echo "------------" >> report
+	cat report | sudo mail -s "Inode Alert::`hostname`::" clen.mo@endurance.com;
+}
+
+function error_file {
+	echo "------------" >> report
+	echo "Setquota failed for following users" >> report
+	arr=("$@")
+	for i in ${arr[@]}; do echo $i; done  >> report
+	echo "------------" >> report
+	echo -e "\n\n" >> report
+}
+	
 
 temp=[]
+userlist=[]
 
-cat  /usr/local/eig_zabbix/tmp/zabbix_inode_abuse| while read user inum; 
-	do 
-		home_path0=`getent passwd $user`; 
-		home=`echo $home_path0| awk -F: "/$user/"'{print $6}' /etc/passwd`; 
-		cd $home;
-		mount_point=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd)) |grep dev | awk '{print $NF}'); 
-		dquota=$(repquota -v $mount_point| awk "/^$user /"'{print $4}');
-		touch inode-distribution.txt;
-		chown $user:$user inode-distribution.txt;
-		/root/bin/inodes >> inode-distribution.txt; sleep 2s; 
-		/usr/sbin/setquota -u $user $dquota $dquota $inum_lower $inum_lower $mount_point;
-		if [[ $? == "0" ]]; then 
+while read user inum;
+        do
+		userlist+=($user)
+		home_path0=`getent passwd $user` 2> /dev/null;
+		home=`echo $home_path0| awk -F: "/$user/"'{print $6}' /etc/passwd` 2> /dev/null;
+		cd $home 2> /dev/null;
+		mount_point=$(df -P $(dirname $(awk -F: "/$user/"'{print $6}' /etc/passwd)) |grep dev | awk '{print $NF}') 2> /dev/null;
+		dquota=$(repquota -v $mount_point| awk "/^$user /"'{print $4}') 2> /dev/null;
+		touch inode-distribution.txt 2> /dev/null;
+		chown $user:$user inode-distribution.txt 2> /dev/null;
+		/root/bin/inodes >> inode-distribution.txt 2> /dev/null ; sleep 2s;
+		/usr/sbin/setquota -u $user $dquota $dquota $inum_lower $inum_lower $mount_point 2> /dev/null;
+		if [[ $? != "0" ]]; then
 			temp+=($user)
-			isfailed+=1		
+			isfailed+=1            
 		fi
-done
+done < /usr/local/eig_zabbix/tmp/zabbix_inode_abuse
+
 if [[ isfailed -gt '0' ]]; then
-	echo "Setquota failed for following users" 
-	echo "Count  : $isfailed"
-	for i in ${temp[@]}; do
-		echo $i
+	error_file "${temp[@]}"
+	set_file "${userlist[@]}"
 	exit 1;
 else
-	exit 0
+	set_file "${userlist[@]}"
+	exit 0;
